@@ -78,8 +78,12 @@ function renderNextBatch() {
         const msgType = item.type;
         let text = item.content?.body || "";
         const sender = item.sender || "Unknown";
-        const timestamp = item.origin_server_ts ? new Date(item.origin_server_ts).toLocaleString(undefined, {
-            month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
+        const timestamp = item.origin_server_ts ? new Date(item.origin_server_ts).toLocaleString('en-US', {
+            month: 'short', 
+            day: 'numeric', 
+            year: 'numeric', 
+            hour: '2-digit', 
+            minute: '2-digit'
         }) : "";
 
         const msgDiv = document.createElement('div');
