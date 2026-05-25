@@ -3,361 +3,48 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Reddit Chat History Viewer</title>
-    <style>
-        :root {
-            --bg-color: #0b141a;
-            --panel-color: #111b21;
-            --text-main: #e9edef;
-            --text-muted: #8696a0;
-            --accent: #00a884;
-            --bubble-me: #005c4b;
-            --bubble-them: #202c33;
-        }
-
-        body {
-            margin: 0;
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-            background-color: var(--bg-color);
-            color: var(--text-main);
-            display: flex;
-            flex-direction: column;
-            height: 100vh;
-        }
-
-        header {
-            background-color: var(--panel-color);
-            padding: 15px 20px;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            border-bottom: 1px solid #222e35;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
-            flex-wrap: wrap;
-            gap: 10px;
-        }
-
-        h1 { margin: 0; font-size: 1.2rem; font-weight: 500; }
-
-        .controls { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
-
-        input[type="file"] { display: none; }
-        
-        .btn {
-            background-color: var(--accent);
-            color: white;
-            padding: 8px 16px;
-            border-radius: 20px;
-            cursor: pointer;
-            font-weight: bold;
-            font-size: 0.9rem;
-            border: none;
-            transition: opacity 0.2s;
-        }
-        
-        .btn:disabled { background-color: #3b4a54; color: #8696a0; cursor: not-allowed; }
-        .btn-small { padding: 8px 12px; border-radius: 8px; }
-
-        .input-box {
-            background-color: var(--bg-color);
-            border: 1px solid #2a3942;
-            color: var(--text-main);
-            padding: 8px 15px;
-            border-radius: 8px;
-            outline: none;
-        }
-
-        #chat-container {
-            flex: 1;
-            overflow-y: auto;
-            padding: 20px;
-            display: flex;
-            flex-direction: column;
-            gap: 8px;
-            max-width: 800px;
-            width: 100%;
-            margin: 0 auto;
-            box-sizing: border-box;
-            scroll-behavior: smooth;
-        }
-
-        .message {
-            max-width: 65%;
-            padding: 8px 12px;
-            border-radius: 8px;
-            position: relative;
-            word-wrap: break-word;
-            transition: box-shadow 0.5s ease, background-color 0.5s ease;
-        }
-
-        .msg-them { background-color: var(--bubble-them); align-self: flex-start; border-top-left-radius: 0; }
-        .msg-system { background-color: transparent; color: var(--text-muted); align-self: center; font-size: 0.85rem; text-align: center; max-width: 90%; }
-        
-        .sender { font-size: 0.8rem; font-weight: bold; color: #53bdeb; margin-bottom: 4px; }
-        .text { font-size: 0.95rem; line-height: 1.4; }
-        .timestamp { font-size: 0.7rem; color: var(--text-muted); text-align: right; margin-top: 4px; }
-        .stats { font-size: 0.9rem; color: var(--text-muted); }
-
-        /* Highlight classes for the new features */
-        mark { background-color: #ffeb3b; color: black; border-radius: 3px; padding: 0 2px; }
-        .target-flash { box-shadow: 0 0 15px var(--accent); border: 1px solid var(--accent); }
-        
-        .search-group { display: flex; align-items: center; gap: 5px; background: #182229; padding: 5px; border-radius: 8px; }
-    </style>
+    <title>Reddit Chat Archive</title>
+    
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+    
+    <link rel="stylesheet" href="styles.css">
 </head>
 <body>
 
     <header>
-        <div>
+        <div class="header-left">
             <h1>Reddit Chat Archive</h1>
             <div class="stats" id="msg-count">No file loaded</div>
         </div>
         
         <div class="controls">
-            <input type="date" id="jump-date" class="input-box" disabled title="Jump to specific date">
-
             <div class="search-group">
-                <input type="text" id="search" class="input-box" placeholder="Find in chat..." disabled>
-                <button id="btn-prev" class="btn btn-small" disabled>↑</button>
-                <button id="btn-next" class="btn btn-small" disabled>↓</button>
-                <span id="search-stats" style="font-size: 0.8rem; color: var(--text-muted); width: 80px; text-align: center;">0/0</span>
+                <input type="date" id="jump-date" class="input-box" disabled title="Jump to specific date">
+                <div class="search-wrapper">
+                    <input type="text" id="search" class="input-box search-input" placeholder="Find in chat..." disabled>
+                    <span id="search-stats" class="search-stats">0/0</span>
+                </div>
+                <button id="btn-prev" class="btn btn-icon" disabled aria-label="Previous match">↑</button>
+                <button id="btn-next" class="btn btn-icon" disabled aria-label="Next match">↓</button>
             </div>
 
-            <label for="file-upload" class="btn" style="border-radius: 8px;">Load JSON</label>
+            <label for="file-upload" class="btn btn-primary">Load JSON</label>
             <input type="file" id="file-upload" accept=".json">
         </div>
     </header>
 
-    <div id="chat-container">
-        <div style="text-align: center; margin-top: 50px; color: var(--text-muted);">
-            Please select your downloaded JSON archive file to begin.
+    <main id="chat-container">
+        <div id="empty-state" class="empty-state">
+            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+            </svg>
+            <h2>Ready to read</h2>
+            <p>Select your downloaded JSON archive to begin.</p>
         </div>
-    </div>
+    </main>
 
-    <script>
-        let allMessages = [];
-        let displayedCount = 0;
-        const BATCH_SIZE = 100; 
-        
-        // Search State
-        let currentQuery = "";
-        let searchMatches = []; // Stores indices of matching messages
-        let currentMatchIdx = -1;
-
-        // Elements
-        const container = document.getElementById('chat-container');
-        const searchInput = document.getElementById('search');
-        const dateInput = document.getElementById('jump-date');
-        const btnPrev = document.getElementById('btn-prev');
-        const btnNext = document.getElementById('btn-next');
-        const searchStats = document.getElementById('search-stats');
-
-        // Event Listeners
-        document.getElementById('file-upload').addEventListener('change', handleFile);
-        dateInput.addEventListener('change', handleDateJump);
-        
-        // Trigger search when pressing Enter
-        searchInput.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter') executeSearch();
-        });
-        
-        btnNext.addEventListener('click', () => navigateSearch(1));
-        btnPrev.addEventListener('click', () => navigateSearch(-1));
-
-        container.addEventListener('scroll', () => {
-            if (container.scrollTop + container.clientHeight >= container.scrollHeight - 300) {
-                renderNextBatch();
-            }
-        });
-
-        function handleFile(e) {
-            const file = e.target.files[0];
-            if (!file) return;
-
-            const reader = new FileReader();
-            reader.onload = function(event) {
-                try {
-                    const rawData = JSON.parse(event.target.result);
-                    allMessages = Array.isArray(rawData) ? rawData.reverse() : [];
-                    
-                    document.getElementById('msg-count').innerText = `${allMessages.length.toLocaleString()} messages loaded`;
-                    searchInput.disabled = false;
-                    dateInput.disabled = false;
-                    
-                    // Reset and start
-                    container.innerHTML = '';
-                    displayedCount = 0;
-                    renderNextBatch();
-                    
-                } catch (err) {
-                    alert("Failed to parse JSON.");
-                }
-            };
-            reader.readAsText(file);
-        }
-
-        // --- CORE RENDERER ---
-        function renderNextBatch() {
-            if (displayedCount >= allMessages.length) return;
-
-            const fragment = document.createDocumentFragment();
-            const end = Math.min(displayedCount + BATCH_SIZE, allMessages.length);
-
-            // Create regex for highlighting if a search is active
-            let regex = null;
-            if (currentQuery) {
-                const safeQuery = currentQuery.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-                regex = new RegExp(`(${safeQuery})`, 'gi');
-            }
-
-            for (let i = displayedCount; i < end; i++) {
-                const item = allMessages[i];
-                const msgType = item.type;
-                let text = item.content?.body || "";
-                const sender = item.sender || "Unknown";
-                const timestamp = item.origin_server_ts ? new Date(item.origin_server_ts).toLocaleString() : "";
-
-                const msgDiv = document.createElement('div');
-                msgDiv.id = 'msg-' + i; // Tag each message with its index so we can jump to it!
-
-                if (msgType === "m.room.message" && text) {
-                    msgDiv.className = "message msg-them";
-                    
-                    const senderDiv = document.createElement('div');
-                    senderDiv.className = "sender";
-                    senderDiv.innerText = sender.replace(/:reddit.com/g, ''); 
-                    
-                    // XSS Protection + Highlighting
-                    let safeText = escapeHTML(text);
-                    if (regex) {
-                        safeText = safeText.replace(regex, '<mark>$1</mark>');
-                    }
-
-                    const textDiv = document.createElement('div');
-                    textDiv.className = "text";
-                    textDiv.innerHTML = safeText; // Safe because we escaped HTML first
-
-                    const timeDiv = document.createElement('div');
-                    timeDiv.className = "timestamp";
-                    timeDiv.innerText = timestamp;
-
-                    msgDiv.appendChild(senderDiv);
-                    msgDiv.appendChild(textDiv);
-                    msgDiv.appendChild(timeDiv);
-                } else {
-                    msgDiv.className = "message msg-system";
-                    msgDiv.innerText = `System Event / Action (${timestamp})`;
-                }
-
-                fragment.appendChild(msgDiv);
-            }
-
-            container.appendChild(fragment);
-            displayedCount = end;
-        }
-
-        // --- NAVIGATION ENGINE (Jump to Index) ---
-        function jumpToIndex(index) {
-            if (index < 0 || index >= allMessages.length) return;
-            
-            // To provide reading context, we start rendering 10 messages BEFORE the target
-            const startIndex = Math.max(0, index - 10);
-            
-            container.innerHTML = ''; 
-            displayedCount = startIndex; 
-            
-            renderNextBatch(); // Render the batch containing our target
-            
-            // Wait a split second for the DOM to draw, then scroll to it
-            setTimeout(() => {
-                const targetElement = document.getElementById('msg-' + index);
-                if (targetElement) {
-                    targetElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                    
-                    // Flash effect to draw the eye
-                    targetElement.classList.add('target-flash');
-                    setTimeout(() => targetElement.classList.remove('target-flash'), 2500);
-                }
-            }, 100);
-        }
-
-        // --- FEATURE 1: JUMP TO DATE ---
-        function handleDateJump(e) {
-            const targetDate = new Date(e.target.value).getTime();
-            if (!targetDate) return;
-
-            // Find the first message that occurred on or after this date
-            const index = allMessages.findIndex(msg => msg.origin_server_ts >= targetDate);
-            
-            if (index !== -1) {
-                jumpToIndex(index);
-            } else {
-                alert("No messages found on or after this date.");
-            }
-        }
-
-        // --- FEATURE 2: CTRL+F SEARCH ---
-        function executeSearch() {
-            currentQuery = searchInput.value.trim();
-            searchMatches = [];
-            
-            if (!currentQuery) {
-                // Reset UI if search is cleared
-                btnNext.disabled = true;
-                btnPrev.disabled = true;
-                searchStats.innerText = "0/0";
-                jumpToIndex(0); // Jump back to top
-                return;
-            }
-
-            const queryLower = currentQuery.toLowerCase();
-
-            // Scan the entire 43MB file in milliseconds to find all matches
-            allMessages.forEach((msg, idx) => {
-                const text = msg.content?.body || "";
-                if (text.toLowerCase().includes(queryLower)) {
-                    searchMatches.push(idx);
-                }
-            });
-
-            if (searchMatches.length > 0) {
-                currentMatchIdx = 0;
-                btnNext.disabled = false;
-                btnPrev.disabled = false;
-                updateSearchUI();
-                jumpToIndex(searchMatches[currentMatchIdx]);
-            } else {
-                currentMatchIdx = -1;
-                btnNext.disabled = true;
-                btnPrev.disabled = true;
-                searchStats.innerText = "0/0";
-                alert("No matches found.");
-            }
-        }
-
-        function navigateSearch(direction) {
-            if (searchMatches.length === 0) return;
-            
-            currentMatchIdx += direction;
-            
-            // Loop around if they hit the ends
-            if (currentMatchIdx >= searchMatches.length) currentMatchIdx = 0;
-            if (currentMatchIdx < 0) currentMatchIdx = searchMatches.length - 1;
-
-            updateSearchUI();
-            jumpToIndex(searchMatches[currentMatchIdx]);
-        }
-
-        function updateSearchUI() {
-            searchStats.innerText = `${currentMatchIdx + 1} / ${searchMatches.length}`;
-        }
-
-        // Utility to prevent XSS injection from chat messages
-        function escapeHTML(str) {
-            return str.replace(/[&<>'"]/g, tag => ({
-                '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;'
-            }[tag] || tag));
-        }
-    </script>
+    <script src="script.js"></script>
 </body>
 </html>
