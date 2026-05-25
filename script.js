@@ -134,7 +134,7 @@ function jumpToIndex(index) {
     setTimeout(() => {
         const targetElement = document.getElementById('msg-' + index);
         if (targetElement) {
-            targetElement.scrollIntoView({ behavior: 'auto', block: 'center' });
+            targetElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
             
             // Add pulse effect, remove after animation completes
             targetElement.classList.remove('target-flash');
