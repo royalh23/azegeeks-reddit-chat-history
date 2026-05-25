@@ -33,11 +33,13 @@
             justify-content: space-between;
             border-bottom: 1px solid #222e35;
             box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+            flex-wrap: wrap;
+            gap: 10px;
         }
 
         h1 { margin: 0; font-size: 1.2rem; font-weight: 500; }
 
-        .controls { display: flex; gap: 15px; align-items: center; }
+        .controls { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
 
         input[type="file"] { display: none; }
         
@@ -50,16 +52,19 @@
             font-weight: bold;
             font-size: 0.9rem;
             border: none;
+            transition: opacity 0.2s;
         }
+        
+        .btn:disabled { background-color: #3b4a54; color: #8696a0; cursor: not-allowed; }
+        .btn-small { padding: 8px 12px; border-radius: 8px; }
 
-        .search-bar {
+        .input-box {
             background-color: var(--bg-color);
             border: 1px solid #2a3942;
             color: var(--text-main);
             padding: 8px 15px;
-            border-radius: 20px;
+            border-radius: 8px;
             outline: none;
-            width: 250px;
         }
 
         #chat-container {
@@ -73,6 +78,7 @@
             width: 100%;
             margin: 0 auto;
             box-sizing: border-box;
+            scroll-behavior: smooth;
         }
 
         .message {
@@ -80,77 +86,86 @@
             padding: 8px 12px;
             border-radius: 8px;
             position: relative;
-            animation: fadeIn 0.3s ease;
             word-wrap: break-word;
+            transition: box-shadow 0.5s ease, background-color 0.5s ease;
         }
 
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
-
-        .msg-them {
-            background-color: var(--bubble-them);
-            align-self: flex-start;
-            border-top-left-radius: 0;
-        }
-
-        .msg-system {
-            background-color: transparent;
-            color: var(--text-muted);
-            align-self: center;
-            font-size: 0.85rem;
-            text-align: center;
-            max-width: 90%;
-        }
-
-        .sender {
-            font-size: 0.8rem;
-            font-weight: bold;
-            color: #53bdeb;
-            margin-bottom: 4px;
-        }
-
+        .msg-them { background-color: var(--bubble-them); align-self: flex-start; border-top-left-radius: 0; }
+        .msg-system { background-color: transparent; color: var(--text-muted); align-self: center; font-size: 0.85rem; text-align: center; max-width: 90%; }
+        
+        .sender { font-size: 0.8rem; font-weight: bold; color: #53bdeb; margin-bottom: 4px; }
         .text { font-size: 0.95rem; line-height: 1.4; }
-
-        .timestamp {
-            font-size: 0.7rem;
-            color: var(--text-muted);
-            text-align: right;
-            margin-top: 4px;
-        }
-
+        .timestamp { font-size: 0.7rem; color: var(--text-muted); text-align: right; margin-top: 4px; }
         .stats { font-size: 0.9rem; color: var(--text-muted); }
+
+        /* Highlight classes for the new features */
+        mark { background-color: #ffeb3b; color: black; border-radius: 3px; padding: 0 2px; }
+        .target-flash { box-shadow: 0 0 15px var(--accent); border: 1px solid var(--accent); }
+        
+        .search-group { display: flex; align-items: center; gap: 5px; background: #182229; padding: 5px; border-radius: 8px; }
     </style>
 </head>
 <body>
 
     <header>
-        <h1>Reddit Group Chat Archive</h1>
+        <div>
+            <h1>Reddit Chat Archive</h1>
+            <div class="stats" id="msg-count">No file loaded</div>
+        </div>
+        
         <div class="controls">
-            <span class="stats" id="msg-count">No file loaded</span>
-            <input type="text" id="search" class="search-bar" placeholder="Search messages..." disabled>
-            <label for="file-upload" class="btn">Choose JSON File</label>
+            <input type="date" id="jump-date" class="input-box" disabled title="Jump to specific date">
+
+            <div class="search-group">
+                <input type="text" id="search" class="input-box" placeholder="Find in chat..." disabled>
+                <button id="btn-prev" class="btn btn-small" disabled>↑</button>
+                <button id="btn-next" class="btn btn-small" disabled>↓</button>
+                <span id="search-stats" style="font-size: 0.8rem; color: var(--text-muted); width: 80px; text-align: center;">0/0</span>
+            </div>
+
+            <label for="file-upload" class="btn" style="border-radius: 8px;">Load JSON</label>
             <input type="file" id="file-upload" accept=".json">
         </div>
     </header>
 
     <div id="chat-container">
         <div style="text-align: center; margin-top: 50px; color: var(--text-muted);">
-            Please select your downloaded JSON archive file above to view the chat stream.
+            Please select your downloaded JSON archive file to begin.
         </div>
     </div>
 
     <script>
         let allMessages = [];
-        let filteredMessages = [];
         let displayedCount = 0;
-        const BATCH_SIZE = 150; // Loads 150 at a time to keep scrolling perfectly lag-free
+        const BATCH_SIZE = 100; 
         
-        document.getElementById('file-upload').addEventListener('change', handleFile);
-        document.getElementById('search').addEventListener('input', handleSearch);
-        
+        // Search State
+        let currentQuery = "";
+        let searchMatches = []; // Stores indices of matching messages
+        let currentMatchIdx = -1;
+
+        // Elements
         const container = document.getElementById('chat-container');
+        const searchInput = document.getElementById('search');
+        const dateInput = document.getElementById('jump-date');
+        const btnPrev = document.getElementById('btn-prev');
+        const btnNext = document.getElementById('btn-next');
+        const searchStats = document.getElementById('search-stats');
+
+        // Event Listeners
+        document.getElementById('file-upload').addEventListener('change', handleFile);
+        dateInput.addEventListener('change', handleDateJump);
+        
+        // Trigger search when pressing Enter
+        searchInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') executeSearch();
+        });
+        
+        btnNext.addEventListener('click', () => navigateSearch(1));
+        btnPrev.addEventListener('click', () => navigateSearch(-1));
+
         container.addEventListener('scroll', () => {
-            // Infinite scroll check: if near bottom, render next batch
-            if (container.scrollTop + container.clientHeight >= container.scrollHeight - 200) {
+            if (container.scrollTop + container.clientHeight >= container.scrollHeight - 300) {
                 renderNextBatch();
             }
         });
@@ -163,55 +178,64 @@
             reader.onload = function(event) {
                 try {
                     const rawData = JSON.parse(event.target.result);
-                    
-                    // Matrix loops backward, let's reverse it so it reads chronologically (past -> present)
                     allMessages = Array.isArray(rawData) ? rawData.reverse() : [];
-                    filteredMessages = [...allMessages];
                     
-                    document.getElementById('search').disabled = false;
                     document.getElementById('msg-count').innerText = `${allMessages.length.toLocaleString()} messages loaded`;
+                    searchInput.disabled = false;
+                    dateInput.disabled = false;
                     
-                    // Reset viewer status
+                    // Reset and start
                     container.innerHTML = '';
                     displayedCount = 0;
                     renderNextBatch();
                     
                 } catch (err) {
-                    alert("Failed to parse JSON file. Make sure it's a valid export format.");
-                    console.error(err);
+                    alert("Failed to parse JSON.");
                 }
             };
             reader.readAsText(file);
         }
 
+        // --- CORE RENDERER ---
         function renderNextBatch() {
-            if (displayedCount >= filteredMessages.length) return;
+            if (displayedCount >= allMessages.length) return;
 
             const fragment = document.createDocumentFragment();
-            const end = Math.min(displayedCount + BATCH_SIZE, filteredMessages.length);
+            const end = Math.min(displayedCount + BATCH_SIZE, allMessages.length);
+
+            // Create regex for highlighting if a search is active
+            let regex = null;
+            if (currentQuery) {
+                const safeQuery = currentQuery.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                regex = new RegExp(`(${safeQuery})`, 'gi');
+            }
 
             for (let i = displayedCount; i < end; i++) {
-                const item = filteredMessages[i];
-                
-                // Extract useful data from Matrix JSON schema structure
-                const sender = item.sender || "Unknown User";
-                const text = item.content?.body || "";
-                const timestamp = item.origin_server_ts ? new Date(item.origin_server_ts).toLocaleString() : "";
+                const item = allMessages[i];
                 const msgType = item.type;
+                let text = item.content?.body || "";
+                const sender = item.sender || "Unknown";
+                const timestamp = item.origin_server_ts ? new Date(item.origin_server_ts).toLocaleString() : "";
 
                 const msgDiv = document.createElement('div');
-                
-                // Differentiate standard text messages from system membership updates
+                msgDiv.id = 'msg-' + i; // Tag each message with its index so we can jump to it!
+
                 if (msgType === "m.room.message" && text) {
                     msgDiv.className = "message msg-them";
                     
                     const senderDiv = document.createElement('div');
                     senderDiv.className = "sender";
-                    senderDiv.innerText = sender.replace(/:reddit.com/g, ''); // Clean username formatting
+                    senderDiv.innerText = sender.replace(/:reddit.com/g, ''); 
                     
+                    // XSS Protection + Highlighting
+                    let safeText = escapeHTML(text);
+                    if (regex) {
+                        safeText = safeText.replace(regex, '<mark>$1</mark>');
+                    }
+
                     const textDiv = document.createElement('div');
                     textDiv.className = "text";
-                    textDiv.innerText = text;
+                    textDiv.innerHTML = safeText; // Safe because we escaped HTML first
 
                     const timeDiv = document.createElement('div');
                     timeDiv.className = "timestamp";
@@ -221,10 +245,8 @@
                     msgDiv.appendChild(textDiv);
                     msgDiv.appendChild(timeDiv);
                 } else {
-                    // System actions (e.g., users joining, leaving, changing channel settings)
                     msgDiv.className = "message msg-system";
-                    let actionText = item.content?.membership ? `${sender} ${item.content.membership}` : "System Event / Image Reference";
-                    msgDiv.innerText = `${actionText} (${timestamp})`;
+                    msgDiv.innerText = `System Event / Action (${timestamp})`;
                 }
 
                 fragment.appendChild(msgDiv);
@@ -234,23 +256,107 @@
             displayedCount = end;
         }
 
-        function handleSearch(e) {
-            const query = e.target.value.toLowerCase().trim();
+        // --- NAVIGATION ENGINE (Jump to Index) ---
+        function jumpToIndex(index) {
+            if (index < 0 || index >= allMessages.length) return;
             
-            if (!query) {
-                filteredMessages = [...allMessages];
+            // To provide reading context, we start rendering 10 messages BEFORE the target
+            const startIndex = Math.max(0, index - 10);
+            
+            container.innerHTML = ''; 
+            displayedCount = startIndex; 
+            
+            renderNextBatch(); // Render the batch containing our target
+            
+            // Wait a split second for the DOM to draw, then scroll to it
+            setTimeout(() => {
+                const targetElement = document.getElementById('msg-' + index);
+                if (targetElement) {
+                    targetElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    
+                    // Flash effect to draw the eye
+                    targetElement.classList.add('target-flash');
+                    setTimeout(() => targetElement.classList.remove('target-flash'), 2500);
+                }
+            }, 100);
+        }
+
+        // --- FEATURE 1: JUMP TO DATE ---
+        function handleDateJump(e) {
+            const targetDate = new Date(e.target.value).getTime();
+            if (!targetDate) return;
+
+            // Find the first message that occurred on or after this date
+            const index = allMessages.findIndex(msg => msg.origin_server_ts >= targetDate);
+            
+            if (index !== -1) {
+                jumpToIndex(index);
             } else {
-                filteredMessages = allMessages.filter(item => {
-                    const text = item.content?.body || "";
-                    const sender = item.sender || "";
-                    return text.toLowerCase().includes(query) || sender.toLowerCase().includes(query);
-                });
+                alert("No messages found on or after this date.");
             }
+        }
+
+        // --- FEATURE 2: CTRL+F SEARCH ---
+        function executeSearch() {
+            currentQuery = searchInput.value.trim();
+            searchMatches = [];
             
-            container.innerHTML = '';
-            displayedCount = 0;
-            renderNextBatch();
-            container.scrollTop = 0;
+            if (!currentQuery) {
+                // Reset UI if search is cleared
+                btnNext.disabled = true;
+                btnPrev.disabled = true;
+                searchStats.innerText = "0/0";
+                jumpToIndex(0); // Jump back to top
+                return;
+            }
+
+            const queryLower = currentQuery.toLowerCase();
+
+            // Scan the entire 43MB file in milliseconds to find all matches
+            allMessages.forEach((msg, idx) => {
+                const text = msg.content?.body || "";
+                if (text.toLowerCase().includes(queryLower)) {
+                    searchMatches.push(idx);
+                }
+            });
+
+            if (searchMatches.length > 0) {
+                currentMatchIdx = 0;
+                btnNext.disabled = false;
+                btnPrev.disabled = false;
+                updateSearchUI();
+                jumpToIndex(searchMatches[currentMatchIdx]);
+            } else {
+                currentMatchIdx = -1;
+                btnNext.disabled = true;
+                btnPrev.disabled = true;
+                searchStats.innerText = "0/0";
+                alert("No matches found.");
+            }
+        }
+
+        function navigateSearch(direction) {
+            if (searchMatches.length === 0) return;
+            
+            currentMatchIdx += direction;
+            
+            // Loop around if they hit the ends
+            if (currentMatchIdx >= searchMatches.length) currentMatchIdx = 0;
+            if (currentMatchIdx < 0) currentMatchIdx = searchMatches.length - 1;
+
+            updateSearchUI();
+            jumpToIndex(searchMatches[currentMatchIdx]);
+        }
+
+        function updateSearchUI() {
+            searchStats.innerText = `${currentMatchIdx + 1} / ${searchMatches.length}`;
+        }
+
+        // Utility to prevent XSS injection from chat messages
+        function escapeHTML(str) {
+            return str.replace(/[&<>'"]/g, tag => ({
+                '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;'
+            }[tag] || tag));
         }
     </script>
 </body>
