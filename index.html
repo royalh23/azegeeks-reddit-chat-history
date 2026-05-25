@@ -3,19 +3,18 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Reddit Chat Archive</title>
-    
+    <title>r/ChatArchive</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
-    
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
 
     <header>
         <div class="header-left">
-            <h1>Reddit Chat Archive</h1>
+            <div class="logo-circle"></div>
+            <h1>r/ChatArchive</h1>
             <div class="stats" id="msg-count">No file loaded</div>
         </div>
         
@@ -23,7 +22,7 @@
             <div class="search-group">
                 <input type="date" id="jump-date" class="input-box" disabled title="Jump to specific date">
                 <div class="search-wrapper">
-                    <input type="text" id="search" class="input-box search-input" placeholder="Find in chat..." disabled>
+                    <input type="text" id="search" class="input-box search-input" placeholder="Search (e.g., from:user text)..." disabled>
                     <span id="search-stats" class="search-stats">0/0</span>
                 </div>
                 <button id="btn-prev" class="btn btn-icon" disabled aria-label="Previous match">↑</button>
@@ -35,13 +34,12 @@
         </div>
     </header>
 
-    <main id="chat-container">
-        <div id="empty-state" class="empty-state">
-            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
-            </svg>
-            <h2>Ready to read</h2>
-            <p>Select your downloaded JSON archive to begin.</p>
+    <main id="chat-wrapper">
+        <div id="chat-container">
+            <div id="empty-state" class="empty-state">
+                <h2>Wow, such empty</h2>
+                <p>Select your downloaded JSON archive to load the feed.</p>
+            </div>
         </div>
     </main>
 

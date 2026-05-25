@@ -8,6 +8,7 @@ let searchMatches = [];
 let currentMatchIdx = -1;
 
 // DOM Elements
+const wrapper = document.getElementById('chat-wrapper');
 const container = document.getElementById('chat-container');
 const emptyState = document.getElementById('empty-state');
 const searchInput = document.getElementById('search');
@@ -27,8 +28,8 @@ searchInput.addEventListener('keydown', (e) => {
 btnNext.addEventListener('click', () => navigateSearch(1));
 btnPrev.addEventListener('click', () => navigateSearch(-1));
 
-container.addEventListener('scroll', () => {
-    if (container.scrollTop + container.clientHeight >= container.scrollHeight - 400) {
+wrapper.addEventListener('scroll', () => {
+    if (wrapper.scrollTop + wrapper.clientHeight >= wrapper.scrollHeight - 400) {
         renderNextBatch();
     }
 });
@@ -43,19 +44,17 @@ function handleFile(e) {
             const rawData = JSON.parse(event.target.result);
             allMessages = Array.isArray(rawData) ? rawData.reverse() : [];
             
-            document.getElementById('msg-count').innerText = `${allMessages.length.toLocaleString()} messages loaded`;
+            document.getElementById('msg-count').innerText = `${allMessages.length.toLocaleString()} messages`;
             searchInput.disabled = false;
             dateInput.disabled = false;
             
-            // Clear UI and start rendering
             if (emptyState) emptyState.remove();
             container.innerHTML = '';
             displayedCount = 0;
             renderNextBatch();
             
         } catch (err) {
-            alert("Failed to parse JSON file. Make sure it's the correct export.");
-            console.error(err);
+            alert("Failed to parse JSON file.");
         }
     };
     reader.readAsText(file);
@@ -67,9 +66,17 @@ function renderNextBatch() {
     const fragment = document.createDocumentFragment();
     const end = Math.min(displayedCount + BATCH_SIZE, allMessages.length);
 
+    // Figure out if we need to highlight text (ignore the "from:" part)
     let regex = null;
-    if (currentQuery) {
-        const safeQuery = currentQuery.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    let textQueryForHighlight = currentQuery;
+    
+    const fromMatch = currentQuery.match(/from:\s*([^\s]+)/i);
+    if (fromMatch) {
+         textQueryForHighlight = currentQuery.replace(fromMatch[0], '').trim();
+    }
+
+    if (textQueryForHighlight) {
+        const safeQuery = textQueryForHighlight.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
         regex = new RegExp(`(${safeQuery})`, 'gi');
     }
 
@@ -77,25 +84,31 @@ function renderNextBatch() {
         const item = allMessages[i];
         const msgType = item.type;
         let text = item.content?.body || "";
-        const sender = item.sender || "Unknown";
+        const sender = item.sender || "Unknown User";
         const timestamp = item.origin_server_ts ? new Date(item.origin_server_ts).toLocaleString('en-US', {
-            month: 'short', 
-            day: 'numeric', 
-            year: 'numeric', 
-            hour: '2-digit', 
-            minute: '2-digit'
+            month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit'
         }) : "";
 
         const msgDiv = document.createElement('div');
         msgDiv.id = 'msg-' + i;
+        msgDiv.className = "message";
 
         if (msgType === "m.room.message" && text) {
-            msgDiv.className = "message msg-them";
+            // Reddit Comment Style Structure
+            const headerDiv = document.createElement('div');
+            headerDiv.className = "message-header";
             
-            const senderDiv = document.createElement('div');
-            senderDiv.className = "sender";
-            senderDiv.innerText = sender.replace(/:reddit.com/g, ''); 
+            const senderSpan = document.createElement('span');
+            senderSpan.className = "sender";
+            senderSpan.innerText = sender.replace(/:reddit.com/g, ''); 
             
+            const timeSpan = document.createElement('span');
+            timeSpan.className = "timestamp";
+            timeSpan.innerText = `• ${timestamp}`; // Added bullet point
+
+            headerDiv.appendChild(senderSpan);
+            headerDiv.appendChild(timeSpan);
+
             let safeText = escapeHTML(text);
             if (regex) safeText = safeText.replace(regex, '<mark>$1</mark>');
 
@@ -103,16 +116,11 @@ function renderNextBatch() {
             textDiv.className = "text";
             textDiv.innerHTML = safeText; 
 
-            const timeDiv = document.createElement('div');
-            timeDiv.className = "timestamp";
-            timeDiv.innerText = timestamp;
-
-            msgDiv.appendChild(senderDiv);
+            msgDiv.appendChild(headerDiv);
             msgDiv.appendChild(textDiv);
-            msgDiv.appendChild(timeDiv);
         } else {
-            msgDiv.className = "message msg-system";
-            msgDiv.innerText = `System Event (${timestamp})`;
+            msgDiv.classList.add("msg-system");
+            msgDiv.innerText = `System Event • ${timestamp}`;
         }
 
         fragment.appendChild(msgDiv);
@@ -128,20 +136,16 @@ function jumpToIndex(index) {
     const startIndex = Math.max(0, index - 10);
     container.innerHTML = ''; 
     displayedCount = startIndex; 
-    
     renderNextBatch(); 
     
-    setTimeout(() => {
-        const targetElement = document.getElementById('msg-' + index);
-        if (targetElement) {
-            targetElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            
-            // Add pulse effect, remove after animation completes
-            targetElement.classList.remove('target-flash');
-            void targetElement.offsetWidth; // Trigger DOM reflow
-            targetElement.classList.add('target-flash');
-        }
-    }, 150);
+    // Using auto instead of smooth to snap instantly
+    const targetElement = document.getElementById('msg-' + index);
+    if (targetElement) {
+        targetElement.scrollIntoView({ behavior: 'auto', block: 'center' });
+        targetElement.classList.remove('target-flash');
+        void targetElement.offsetWidth;
+        targetElement.classList.add('target-flash');
+    }
 }
 
 function handleDateJump(e) {
@@ -149,14 +153,11 @@ function handleDateJump(e) {
     if (!targetDate) return;
 
     const index = allMessages.findIndex(msg => msg.origin_server_ts >= targetDate);
-    
-    if (index !== -1) {
-        jumpToIndex(index);
-    } else {
-        alert("No messages found on or after this date.");
-    }
+    if (index !== -1) jumpToIndex(index);
+    else alert("No messages found on or after this date.");
 }
 
+// THE NEW SEARCH ENGINE
 function executeSearch() {
     currentQuery = searchInput.value.trim();
     searchMatches = [];
@@ -169,11 +170,34 @@ function executeSearch() {
         return;
     }
 
-    const queryLower = currentQuery.toLowerCase();
+    // Parse the 'from:username' syntax
+    let targetSender = null;
+    let textQuery = currentQuery;
 
+    const fromMatch = currentQuery.match(/from:\s*([^\s]+)/i);
+    if (fromMatch) {
+        targetSender = fromMatch[1].toLowerCase();
+        // Remove the 'from:' parameter to search the remaining text
+        textQuery = currentQuery.replace(fromMatch[0], '').trim().toLowerCase();
+    } else {
+        textQuery = textQuery.toLowerCase();
+    }
+
+    // Filter Loop
     allMessages.forEach((msg, idx) => {
-        const text = msg.content?.body || "";
-        if (text.toLowerCase().includes(queryLower)) searchMatches.push(idx);
+        const text = (msg.content?.body || "").toLowerCase();
+        const sender = (msg.sender || "").toLowerCase().replace(/:reddit\.com/g, '');
+
+        let matchesSender = true;
+        let matchesText = true;
+
+        if (targetSender) matchesSender = sender.includes(targetSender);
+        if (textQuery) matchesText = text.includes(textQuery);
+
+        // It must match both conditions to be a hit
+        if (matchesSender && matchesText && (targetSender || textQuery)) {
+            searchMatches.push(idx);
+        }
     });
 
     if (searchMatches.length > 0) {
@@ -193,7 +217,6 @@ function executeSearch() {
 
 function navigateSearch(direction) {
     if (searchMatches.length === 0) return;
-    
     currentMatchIdx += direction;
     if (currentMatchIdx >= searchMatches.length) currentMatchIdx = 0;
     if (currentMatchIdx < 0) currentMatchIdx = searchMatches.length - 1;
